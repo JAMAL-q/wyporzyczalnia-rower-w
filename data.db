@@ -1,0 +1,270 @@
+-- Tworzenie bazy danych
+USE master
+CREATE DATABASE [Biblioteka_g2];
+GO
+USE [Biblioteka_g2];
+
+CREATE TABLE country (
+	country_id INT IDENTITY (1,1),
+	country VARCHAR(20) NOT NULL,
+	country_short VARCHAR(3) NOT NULL
+	CONSTRAINT PK_country_country_id PRIMARY KEY CLUSTERED (country_id)
+)
+
+CREATE TABLE [status] (
+	status_id INT IDENTITY(1,1) PRIMARY KEY,
+	status_name varchar(50) NOT NULL,
+	status_desc varchar(200),
+	status_type varchar(50), -- typ statusu
+	[status] BIT -- akrtywny, nieakrywny
+)
+
+
+-- Tabela Authors (Autorzy)
+CREATE TABLE authors (
+    author_id INT IDENTITY(1,1) PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    birth_date DATE,
+	country_id INT NOT NULL DEFAULT 1,
+    biography VARCHAR(MAX),
+	FOREIGN KEY (country_id) REFERENCES country(country_id) 
+);
+
+
+-- Tabela Books (Książki)
+IF NOT EXISTS (SELECT 1 FROM [INFORMATION_SCHEMA].[TABLES] WHERE TABLE_NAME ='books' )
+CREATE TABLE books (
+    book_id INT IDENTITY(1,1) PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    isbn VARCHAR(20) UNIQUE,
+    publication_year INT,
+    publisher VARCHAR(100),
+    genre VARCHAR(50),
+    available_copies INT DEFAULT 1,
+    total_copies INT DEFAULT 1,
+	status_id INT NOT NULL,
+	FOREIGN KEY ([status_id]) REFERENCES [status]([status_id])
+);
+
+-- Tabela łącząca Authors i Books (AutorzyKsiążek)
+CREATE TABLE authorsBooks (
+    --author_book_id INT IDENTITY(1,1) PRIMARY KEY,
+    author_id INT NOT NULL,
+    book_id INT NOT NULL,
+    FOREIGN KEY (author_id) REFERENCES authors(author_id),
+    FOREIGN KEY (book_id) REFERENCES books(book_id),
+    --UNIQUE (author_id, book_id)
+	CONSTRAINT PK_authorsBooks_author_id_book_id PRIMARY KEY CLUSTERED (author_id,book_id)
+);
+
+-- Tabela User (Użytkownicy systemu)
+CREATE TABLE [user] (
+    [user_id] INT IDENTITY(1,1) PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    [role] VARCHAR(20) CHECK ([role] in ('admin', 'librarian', 'user')),
+    created_at DATETIME DEFAULT GETDATE(),
+    last_login DATETIME,
+	status_id INT NOT NULL,
+	FOREIGN KEY ([status_id]) REFERENCES [status]([status_id])
+);
+
+--ALTER TABLE dbo.[User]
+--ADD CONSTRAINT DF_wlasna_nazwa_constrain_role CHECK ([role] in ('admin', 'librarian', 'user'))
+--GO
+
+
+
+-- Tabela Czytelnicy (Czytelnicy biblioteki)
+CREATE TABLE readers (
+    readers_id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    [address] VARCHAR(100),
+    phone VARCHAR(20),
+    registration_date DATE DEFAULT GETDATE(),
+	status_id INT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES [User](user_id),
+	FOREIGN KEY ([status_id]) REFERENCES [status]([status_id])
+);
+
+-- Tabela Wypożyczenia (Wypożyczenia książek)
+CREATE TABLE borrowing (
+    borrowing_id INT IDENTITY(1,1) PRIMARY KEY,
+    book_id INT NOT NULL,
+    readers_id INT NOT NULL,
+    borrowing_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    return_date DATETIME,
+    due INT NOT NULL,
+    [status] varchar(20) CHECK ([status] in ('wypożyczona', 'zwrócona', 'przetrzymana')) DEFAULT 'wypożyczona',
+	[status_id] INT NOT NULL,
+    FOREIGN KEY (book_id) REFERENCES books(book_id),
+    FOREIGN KEY (readers_id) REFERENCES readers(readers_id),
+	FOREIGN KEY ([status_id]) REFERENCES [status]([status_id])
+);
+
+-- Tabela Rezerwacja (Rezerwacje książek)
+CREATE TABLE dbo.reservation (
+    reservation_id INT IDENTITY(1,1) PRIMARY KEY,
+    book_id INT NOT NULL,
+    readers_id INT NOT NULL,
+    reservation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+	--[status] varchar(20) CHECK ([status] in ('aktywna', 'zrealizowana', 'anulowana')) DEFAULT 'aktywna',
+	[status_id] INT NOT NULL,
+    FOREIGN KEY (book_id) REFERENCES Books(book_id),
+    FOREIGN KEY (readers_id) REFERENCES readers(readers_id),
+	FOREIGN KEY ([status_id]) REFERENCES [status]([status_id])
+);
+-- CREATE INDEX index1 ON schema1.table1 (column1);
+CREATE INDEX IX_reservation_book_is ON dbo.reservation(book_id)
+	
+
+
+
+-- Tabela kary (Kary za przetrzymanie)
+CREATE TABLE fine (
+    fine_id INT IDENTITY(1,1) PRIMARY KEY,
+    borrowing_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    date_issue DATETIME DEFAULT CURRENT_TIMESTAMP,
+    date_pay DATETIME,
+	--[status] varchar(20) CHECK ([status] in ('naliczona', 'opłacona', 'umorzona')) DEFAULT 'naliczona',
+	[status_id] INT NOT NULL
+    FOREIGN KEY (borrowing_id) REFERENCES borrowing(borrowing_id),
+	FOREIGN KEY ([status_id]) REFERENCES [status]([status_id])
+);
+
+
+
+
+--INSERT INTO nazwa (kolumna) VALUES (wartosc)
+INSERT INTO dbo.[status] ([status_name],[status_desc],[status_type],[status])
+VALUES ('Dostępna','Książka jest dostępna w bibliotece','books',1)
+
+INSERT INTO dbo.[status] ([status_name],[status_type],[status])
+VALUES ('Niedostepna','books',1),
+('Aktywny','users',1),
+('Nieaktywny','users',1)
+
+
+-- SELECT * FROM dbo.status 
+
+-- Tabela: country
+INSERT INTO country (country, country_short) VALUES
+('Słowacja', 'SK'),
+('Węgry', 'HU'),
+('Norwegia', 'NO'),
+('Francja', 'FR'),
+('Portugalia', 'PT'),
+('Grecja', 'GR');
+('Szwecja', 'SE'),
+('Ukraina', 'UA'),
+('Austria', 'AT'),
+('Holandia', 'NL'),
+
+-- Tabela: authors
+INSERT INTO authors (first_name, last_name, birth_date, country_id, biography) VALUES
+('Elias', 'Nordgren', '1975-04-12', 3, 'Autor skandynawskich thrillerów'),
+('Lucía', 'Silva', '1983-07-08', 2, 'Pisarka portugalskich powieści obyczajowych'),
+('Yulia', 'Ivanenko', '1990-11-23', 5, 'Młoda ukraińska poetka'),
+('Gunnar', 'Larsen', '1968-03-19', 4, 'Szwedzki eseista i podróżnik'),
+('Anna', 'Kovács', '1979-09-10', 7, 'Węgierska autorka powieści historycznych'),
+('Marek', 'Fischer', '1981-02-14', 8, 'Austriacki pisarz science-fiction'),
+('Sofie', 'Janssen', '1992-06-03', 9, 'Holenderska autorka literatury młodzieżowej'),
+('Nikos', 'Papadopoulos', '1973-10-25', 10, 'Grecki poeta i tłumacz'),
+('Peter', 'Skov', '1985-12-05', 3, 'Norweski pisarz fantasy'),
+('Beata', 'Horváth', '1965-03-15', 7, 'Węgierska eseistka');
+
+-- Tabela: books
+INSERT INTO books (title, isbn, publication_year, publisher, genre, status_id) VALUES
+('Cień nad fiordem', '9780000000001', 2010, 'SkandBooks', 'Thriller', 1),
+('Lisboa w deszczu', '9780000000002', 2015, 'PortoEdit', 'Romans', 1),
+('Echo z Donbasu', '9780000000003', 2018, 'UkrLit', 'Poezja', 1),
+('Na krańcu lodu', '9780000000004', 2012, 'SzweLit', 'Esej', 1),
+('Korona Arpada', '9780000000005', 2007, 'BudapestPress', 'Historyczna', 1),
+('Miasto pod ziemią', '9780000000006', 2019, 'ViennaHouse', 'Science-fiction', 1),
+('Zielone światło', '9780000000007', 2020, 'AmsterdamBooks', 'Młodzieżowa', 1),
+('Mitologia Egejska', '9780000000008', 2001, 'AthensPress', 'Esej', 1),
+('Brama cieni', '9780000000009', 2021, 'NordFantasy', 'Fantasy', 1),
+('Ślady myśli', '9780000000010', 2005, 'BudapestEssay', 'Esej', 1);
+
+-- Tabela: authorsBooks
+INSERT INTO authorsBooks (author_id, book_id) VALUES
+(1, 1),
+(2, 2),
+(3, 3),
+(4, 4),
+(5, 5),
+(6, 6),
+(7, 7),
+(8, 8),
+(9, 9),
+(10, 10);
+
+-- Tabela: user
+INSERT INTO [user] (username, password_hash, email, role, status_id) VALUES
+('admin_new', 'hash_admin', 'admin@library.com', 'admin', 3),
+('librarian_new', 'hash_lib', 'librarian@library.com', 'librarian', 3),
+('user_alpha', 'hash_alpha', 'alpha@library.com', 'user', 3),
+('user_beta', 'hash_beta', 'beta@library.com', 'user', 3),
+('user_gamma', 'hash_gamma', 'gamma@library.com', 'user', 3),
+('user_delta', 'hash_delta', 'delta@library.com', 'user', 3),
+('user_epsilon', 'hash_epsilon', 'epsilon@library.com', 'user', 3),
+('user_zeta', 'hash_zeta', 'zeta@library.com', 'user', 3),
+('user_eta', 'hash_eta', 'eta@library.com', 'user', 3),
+('user_theta', 'hash_theta', 'theta@library.com', 'user', 3);
+
+-- Tabela: readers
+INSERT INTO readers (user_id, first_name, last_name, address, phone, status_id) VALUES
+(3, 'Daniel', 'Nowak', 'ul. Długa 10', '600100200', 3),
+(4, 'Katarzyna', 'Wójcik', 'ul. Krótka 5', '600200300', 3),
+(5, 'Piotr', 'Kowal', 'ul. Leśna 7', '600300400', 3),
+(6, 'Anna', 'Kamińska', 'ul. Parkowa 2', '600400500', 3),
+(7, 'Tomasz', 'Zając', 'ul. Polna 9', '600500600', 3),
+(8, 'Monika', 'Grabowska', 'ul. Sosnowa 4', '600600700', 3),
+(9, 'Krzysztof', 'Lis', 'ul. Brzozowa 6', '600700800', 3),
+(10, 'Paweł', 'Duda', 'ul. Akacjowa 8', '600800900', 3),
+(11, 'Zofia', 'Michalska', 'ul. Klonowa 11', '600900100', 3),
+(12, 'Natalia', 'Baran', 'ul. Jesionowa 12', '601001001', 3);
+
+-- Tabela: borrowing
+INSERT INTO borrowing (book_id, readers_id, due, status_id) VALUES
+(1, 1, 14, 1),
+(2, 2, 14, 1),
+(3, 3, 14, 1),
+(4, 4, 14, 1),
+(5, 5, 14, 1),
+(6, 6, 14, 1),
+(7, 7, 14, 1),
+(8, 8, 14, 1),
+(9, 9, 14, 1),
+(10, 10, 14, 1);
+
+-- Tabela: reservation
+INSERT INTO reservation (book_id, readers_id, status_id) VALUES
+(1, 2, 1),
+(2, 3, 1),
+(3, 4, 1),
+(4, 5, 1),
+(5, 6, 1),
+(6, 7, 1),
+(7, 8, 1),
+(8, 9, 1),
+(9, 10, 1),
+(10, 1, 1);
+
+-- Tabela: fine
+INSERT INTO fine (borrowing_id, amount, status_id) VALUES
+(1, 4.50, 1),
+(2, 3.20, 1),
+(3, 2.80, 1),
+(4, 5.00, 1),
+(5, 6.75, 1),
+(6, 3.40, 1),
+(7, 4.90, 1),
+(8, 2.60, 1),
+(9, 3.90, 1),
+(10, 7.10, 1);
